@@ -1,1 +1,1 @@
-worker: python bot_timer.py
+web: python bot_timer.py
