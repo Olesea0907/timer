@@ -68,7 +68,7 @@ app.add_handler(CommandHandler("start_timer", start_timer))
 
 print("⏳ Botul rulează! Folosește: /start_timer DD.MM.YYYY HH:MM")
 PORT = int(os.environ.get("PORT", 8443))
-WEBHOOK_URL = f"https://worker-production-03e3.up.railway.app/{TOKEN}"
+WEBHOOK_URL = f"https://dynamic-spontaneity-production-270c.up.railway.app/{TOKEN}"
 
 app.run_webhook(
     listen="0.0.0.0",
