@@ -1,9 +1,10 @@
+import os
 import asyncio
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = '8059158408:AAG2Kb8jHdevBmfUGVJ_qoQY5AJlBPLK7zg'  
+TOKEN = os.getenv("BOT_TOKEN")  
 
 def format_time_minutes(total_seconds: int) -> str:
     days = total_seconds // 86400
@@ -41,7 +42,6 @@ async def start_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏳ Timp rămas: {format_time_minutes(total_seconds)}"
     )
 
-    # Actualizare la fiecare minut
     for remaining in range(total_seconds - 60, -1, -60):
         await asyncio.sleep(60)
         try:
@@ -54,7 +54,6 @@ async def start_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"Eroare la edit: {e}")
             break
 
-    # Mesaj final
     try:
         await context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
