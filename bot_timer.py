@@ -67,4 +67,11 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start_timer", start_timer))
 
 print("⏳ Botul rulează! Folosește: /start_timer DD.MM.YYYY HH:MM")
-app.run_polling()
+PORT = int(os.environ.get("PORT", 8443))
+WEBHOOK_URL = f"https://lezea-production.up.railway.app/{TOKEN}"
+
+app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    webhook_url=WEBHOOK_URL
+)
