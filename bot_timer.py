@@ -3,6 +3,9 @@ import asyncio
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import aiohttp
+print("✅ aiohttp version:", aiohttp.__version__)
+
 
 TOKEN = os.getenv("BOT_TOKEN")  
 
