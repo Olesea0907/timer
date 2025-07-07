@@ -4,10 +4,13 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import pytz
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")  # Heroku Postgres
 
-# Setează timezone Moldova
+# Fus orar Moldova
 MOLDOVA_TZ = pytz.timezone("Europe/Chisinau")
 
 def format_time_minutes(total_seconds: int) -> str:
@@ -19,20 +22,41 @@ def format_time_minutes(total_seconds: int) -> str:
     else:
         return f"{h:02}h:{m:02}m"
 
-# Funcția care rulează efectiv timer-ul ca task separat
-async def run_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, target_dt):
+# Conexiune DB
+def get_connection():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
+def save_timer(chat_id, end_time):
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS timers (
+                chat_id BIGINT PRIMARY KEY,
+                end_time TIMESTAMP WITH TIME ZONE
+            );
+        """)
+        cur.execute("""
+            INSERT INTO timers (chat_id, end_time)
+            VALUES (%s, %s)
+            ON CONFLICT (chat_id) DO UPDATE SET end_time = EXCLUDED.end_time;
+        """, (chat_id, end_time))
+        conn.commit()
+    conn.close()
+
+async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
     now = datetime.now(MOLDOVA_TZ)
     total_seconds = int((target_dt - now).total_seconds())
 
-    msg = await update.message.reply_text(
-        f"⏳ Timp rămas: {format_time_minutes(total_seconds)}"
+    msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⏳ Timp rămas: {format_time_minutes(total_seconds)}"
     )
 
     for remaining in range(total_seconds - 60, -1, -60):
         await asyncio.sleep(60)
         try:
             await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
+                chat_id=chat_id,
                 message_id=msg.message_id,
                 text=f"⏳ Timp rămas: {format_time_minutes(remaining)}"
             )
@@ -42,14 +66,13 @@ async def run_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, target_d
 
     try:
         await context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
+            chat_id=chat_id,
             message_id=msg.message_id,
             text="⏰ Timpul a expirat!"
         )
     except:
         pass
 
-# Handlerul care validează comanda și pornește task-ul separat
 async def start_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
         await update.message.reply_text(
@@ -71,12 +94,36 @@ async def start_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # PORNEȘTE TASK-UL SEPARAT
-    asyncio.create_task(run_timer(update, context, target_dt))
+    # Salvează în Postgres
+    save_timer(update.effective_chat.id, target_dt.isoformat())
 
-# Construiește botul
+    # Pornește task-ul async separat
+    asyncio.create_task(run_timer(context, update.effective_chat.id, target_dt))
+
+# Restabilește timer-ele salvate la pornire
+async def restore_timers(app):
+    print("🔄 Restabilim timer-ele din DB...")
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("SELECT chat_id, end_time FROM timers;")
+        rows = cur.fetchall()
+    conn.close()
+
+    now = datetime.now(MOLDOVA_TZ)
+    for row in rows:
+        end_time = row['end_time'].astimezone(MOLDOVA_TZ)
+        delta = end_time - now
+        total_seconds = int(delta.total_seconds())
+        if total_seconds > 0:
+            asyncio.create_task(run_timer(app.bot, row['chat_id'], end_time))
+        else:
+            print(f"⏰ Timer expirat pentru chat_id {row['chat_id']} - ignorat.")
+
+# Inițializează botul
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start_timer", start_timer))
+app.post_init = restore_timers  # Rulează la pornire
 
-print("⏳ Botul rulează cu POLLING! Poți folosi /start_timer în mai multe chat-uri simultan.")
+print("⏳ Botul rulează cu POLLING! Timer-ele sunt salvate în Postgres și revin automat.")
 app.run_polling()
+
