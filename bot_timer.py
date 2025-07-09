@@ -48,7 +48,7 @@ def save_timer(chat_id, end_time, message_id):
         conn.commit()
     conn.close()
 
-# 🟢 Pornește un timer NOU (după comanda utilizatorului)
+# 🟢 Pornește un timer NOU
 async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
     now = datetime.now(MOLDOVA_TZ)
     total_seconds = int((target_dt - now).total_seconds())
@@ -57,12 +57,11 @@ async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
         chat_id=chat_id,
         text=f"⏳ Timp rămas: {format_time_minutes(total_seconds)}"
     )
-    print(f"[run_timer] Mesaj nou: {msg.message_id}")
+    print(f"[run_timer] Mesaj nou: {msg.message_id}")  # ✅ CORESPUNZĂTOR AICI!
 
     # Salvează în DB cu noul message_id
     save_timer(chat_id, target_dt.isoformat(), msg.message_id)
 
-    # Bucla de actualizare la fiecare 60 secunde
     for remaining in range(total_seconds - 60, -1, -60):
         await asyncio.sleep(60)
         try:
@@ -75,7 +74,6 @@ async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
             print(f"[run_timer] Eroare la edit: {e}")
             break
 
-    # Finalizare
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -88,7 +86,7 @@ async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
             text="⏰ Timpul a expirat!"
         )
 
-# ♻️ Repornește timer-ul existent (la restart) - versiune cu fallback robust
+# ♻️ Repornește timer-ul existent (la restart) - fallback robust
 async def resume_timer(bot, chat_id, target_dt, message_id):
     now = datetime.now(MOLDOVA_TZ)
     total_seconds = int((target_dt - now).total_seconds())
@@ -105,17 +103,15 @@ async def resume_timer(bot, chat_id, target_dt, message_id):
             )
         except Exception as e:
             print(f"[resume_timer] Eroare la edit: {e}")
-            # Fallback: trimite mesaj nou dacă edit-ul eșuează
+            # Fallback: trimite mesaj nou
             new_msg = await bot.send_message(
                 chat_id=chat_id,
                 text=f"⏳ Timp rămas: {format_time_minutes(remaining)}"
             )
             msg_id = new_msg.message_id
             print(f"[resume_timer] Fallback: mesaj nou trimis cu ID {msg_id}")
-            # Actualizează DB cu noul message_id
             save_timer(chat_id, target_dt.isoformat(), msg_id)
 
-    # Finalizare
     try:
         await bot.edit_message_text(
             chat_id=chat_id,
@@ -152,7 +148,6 @@ async def start_timer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Pornește un task nou
     asyncio.create_task(run_timer(context, update.effective_chat.id, target_dt))
 
 # 🔄 Restore la pornire
@@ -167,9 +162,7 @@ async def restore_timers(app):
     now = datetime.now(MOLDOVA_TZ)
     for row in rows:
         end_time = row['end_time'].astimezone(MOLDOVA_TZ)
-        delta = end_time - now
-        total_seconds = int(delta.total_seconds())
-        if total_seconds > 0:
+        if (end_time - now).total_seconds() > 0:
             print(f"🔄 Repornesc timer pentru chat {row['chat_id']}")
             asyncio.create_task(resume_timer(app.bot, row['chat_id'], end_time, row['message_id']))
         else:
