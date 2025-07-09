@@ -180,3 +180,5 @@ app.post_init = restore_timers
 
 print("✅ Botul rulează cu POLLING! Timer-ele sunt salvate în Postgres și revin automat la restart.")
 app.run_polling()
+print(f"[run_timer] Mesaj nou: {msg.message_id}")
+print(f"[resume_timer] Fallback: mesaj nou trimis cu ID {msg_id}")
