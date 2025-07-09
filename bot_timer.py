@@ -57,6 +57,7 @@ async def run_timer(context: ContextTypes.DEFAULT_TYPE, chat_id, target_dt):
         chat_id=chat_id,
         text=f"⏳ Timp rămas: {format_time_minutes(total_seconds)}"
     )
+    print(f"[run_timer] Mesaj nou: {msg.message_id}")
 
     # Salvează în DB cu noul message_id
     save_timer(chat_id, target_dt.isoformat(), msg.message_id)
@@ -110,6 +111,7 @@ async def resume_timer(bot, chat_id, target_dt, message_id):
                 text=f"⏳ Timp rămas: {format_time_minutes(remaining)}"
             )
             msg_id = new_msg.message_id
+            print(f"[resume_timer] Fallback: mesaj nou trimis cu ID {msg_id}")
             # Actualizează DB cu noul message_id
             save_timer(chat_id, target_dt.isoformat(), msg_id)
 
@@ -180,5 +182,3 @@ app.post_init = restore_timers
 
 print("✅ Botul rulează cu POLLING! Timer-ele sunt salvate în Postgres și revin automat la restart.")
 app.run_polling()
-print(f"[run_timer] Mesaj nou: {msg.message_id}")
-print(f"[resume_timer] Fallback: mesaj nou trimis cu ID {msg_id}")
